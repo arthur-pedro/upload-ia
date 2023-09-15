@@ -2,17 +2,17 @@ import { FastifyInstance } from "fastify";
 import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { openai } from "../lib/openai";
-
+import { streamToResponse, OpenAIStream } from "ai";
 export async function aiTextGenerateRoute(app: FastifyInstance) {
   app.post("/api/generate", async (req, reply) => {
     try {
       const bodySchema = z.object({
         videoId: z.string(),
-        template: z.string(),
+        prompt: z.string(),
         temperature: z.number().min(0).max(1).default(0.5),
       });
 
-      const { temperature, template, videoId } = bodySchema.parse(req.body);
+      const { temperature, prompt, videoId } = bodySchema.parse(req.body);
 
       const video = await prisma.video.findUniqueOrThrow({
         where: {
@@ -26,7 +26,7 @@ export async function aiTextGenerateRoute(app: FastifyInstance) {
         });
       }
 
-      const promptMessage = template.replace(
+      const promptMessage = prompt.replace(
         "{transcription}",
         video.transcription
       );
@@ -40,9 +40,18 @@ export async function aiTextGenerateRoute(app: FastifyInstance) {
             content: promptMessage,
           },
         ],
+        stream: true,
       });
 
-      return response;
+      const stream = OpenAIStream(response);
+
+      streamToResponse(stream, reply.raw, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods":
+            "GET, POST, OPTIONS, PUT, PATCH, DELETE",
+        },
+      });
     } catch (error) {
       console.log(error);
       return reply.status(500).send({

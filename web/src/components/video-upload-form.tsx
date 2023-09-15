@@ -19,6 +19,10 @@ type VideoUploaded = {
 
 type Status = "waiting" | "converting" | "uploading" | "generating" | "success";
 
+interface VideoInputFormProps {
+  onVideoUploaded: (id: string) => void;
+}
+
 const statusMessages = {
   waiting: "Aguardando...",
   converting: "Convertendo...",
@@ -27,7 +31,7 @@ const statusMessages = {
   success: "Sucesso",
 };
 
-export function VideoInputForm() {
+export function VideoInputForm(props: VideoInputFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("waiting");
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
@@ -99,15 +103,17 @@ export function VideoInputForm() {
 
     const video = data.content as VideoUploaded;
 
-    const { id } = video;
+    const { id: videoId } = video;
 
     setStatus("generating");
 
-    await api.post(`/api/video/${id}/transcription`, {
+    await api.post(`/api/video/${videoId}/transcription`, {
       prompt,
     });
 
     setStatus("success");
+
+    props.onVideoUploaded(videoId);
   }
 
   const previewURL = useMemo(() => {
